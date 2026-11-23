@@ -26,7 +26,7 @@ class ShieldCacheTest(unittest.TestCase):
         self._env.start()
 
         self.network = RoadNetwork.create_roundabout_scenario(
-            car_count=3, road_length=12, max_vel=3
+            car_count=3, road_per_circ=12, max_vel=3
         )
         self.system = AbstractRoundaboutSystem(self.network)
         self.safety = roundabout_safety(2)

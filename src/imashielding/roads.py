@@ -46,6 +46,28 @@ class ChancedOutcomeAccel:
     accel: int
 
 
+def _accel_actions(high_acceleration_chance: float) -> Tuple[Tuple[ChancedOutcomeAccel, ...], ...]:
+    """Build the acceleration outcomes with a chance of doubled accel/decel."""
+    assert 0.0 <= high_acceleration_chance <= 1.0
+    normal_chance = 1.0 - high_acceleration_chance
+    outcomes = (
+        (
+            (high_acceleration_chance, -2),
+            (normal_chance, -1),
+        ),
+        ((1.0, 0),),
+        (
+            (normal_chance, 1),
+            (high_acceleration_chance, 2),
+        ),
+    )
+    # Drop impossible outcomes so they cannot affect synthesis or sampling.
+    return tuple(
+        tuple(ChancedOutcomeAccel(chance, accel) for chance, accel in actions if chance > 0.0)
+        for actions in outcomes
+    )
+
+
 class RoadNetwork(ConcurrentGame[RoadNetworkState]):
     def __init__(self, roads: Tuple[RoadSegment, ...], cars: Tuple[CarDef, ...], max_vel: int, min_vel: int, accel_actions: Tuple[Tuple[ChancedOutcomeAccel, ...], ...]):
         self.roads: Tuple[RoadSegment, ...] = roads
@@ -73,76 +95,58 @@ class RoadNetwork(ConcurrentGame[RoadNetworkState]):
             assert min_vel <= car.init_vel <= max_vel
 
     @staticmethod
-    def create_roundabout_scenario(car_count: int = 6, road_length: int = 32, max_vel: int = 4) -> "RoadNetwork":
-        road = RoadSegment(0, road_length, 0, 0, 0, None, Arc((0.0, 0.0), 1.0, -math.pi / 2, 2 * math.pi))
-        init_dist = road_length / car_count
+    def create_roundabout_scenario(car_count: int = 6, road_per_circ: int = 32, max_vel: int = 4, high_acceleration_chance: float = 0.2) -> "RoadNetwork":
+        road = RoadSegment(0, road_per_circ, 0, 0, 0, None, Arc((0.0, 0.0), 1.0, -math.pi / 2, 2 * math.pi))
+        init_dist = road_per_circ / car_count
         cars = tuple(CarDef(i, 0, int(init_dist * i)) for i in range(car_count))
-        # Acceleration is usually within [-1..1] but there is a 20% chance for a 100% increase
-        accel_actions = (
-            (
-                ChancedOutcomeAccel(0.2, -2),
-                ChancedOutcomeAccel(0.8, -1),
-            ),
-            (
-                ChancedOutcomeAccel(1.0, 0),
-            ),
-            (
-                ChancedOutcomeAccel(0.8, 1),
-                ChancedOutcomeAccel(0.2, 2),
-            )
-        )
+        accel_actions = _accel_actions(high_acceleration_chance)
         return RoadNetwork((road,), cars, max_vel, 0, accel_actions)
 
     @staticmethod
-    def create_double_roundabout_scenario(car_count: int = 6, road_per_roundabout: int = 32, max_vel: int = 4) -> "RoadNetwork":
+    def create_double_roundabout_scenario(car_count: int = 6, road_per_circ: int = 32, max_vel: int = 4, high_acceleration_chance: float = 0.2) -> "RoadNetwork":
+        """Two roundabouts joined by two connecting roads.
+
+        ``road_per_circ`` is the number of positions in one roundabout, split
+        across its two segments.
+        """
         road_dist = 2.4
         straight_radius = 3.0
         straight_y_offset = math.sqrt(straight_radius**2 - (road_dist / 2)**2)
         straight_sweep = math.acos(straight_y_offset / straight_radius)
         roads = (
-            RoadSegment(0, round(road_per_roundabout / 2), 1, 1, 1, 3, Arc((0.0, 0.0), 1.0, -math.pi / 2, math.pi)),
-            RoadSegment(1, round(road_per_roundabout / 2), 0, 5, 0, 2, Arc((0.0, 0.0), 1.0, math.pi / 2, math.pi)),
-            RoadSegment(2, round(road_per_roundabout / 2), 3, 4, 3, 1, Arc((road_dist, 0.0), 1.0, -math.pi / 2, math.pi)),
-            RoadSegment(3, round(road_per_roundabout / 2), 2, 2, 2, 0, Arc((road_dist, 0.0), 1.0, math.pi / 2, math.pi)),
-            RoadSegment(4, round(road_dist * road_per_roundabout / math.pi), 1, 1, 2, 5, Arc((road_dist / 2, -straight_y_offset + 1.0), straight_radius, math.pi / 2 - straight_sweep, 2 * straight_sweep)),
-            RoadSegment(5, round(road_dist * road_per_roundabout / math.pi), 2, 2, 1, 4, Arc((road_dist / 2, straight_y_offset - 1.0), straight_radius, -math.pi / 2 - straight_sweep, 2 * straight_sweep)),
+            RoadSegment(0, round(road_per_circ / 2), 1, 1, 1, 3, Arc((0.0, 0.0), 1.0, -math.pi / 2, math.pi)),
+            RoadSegment(1, round(road_per_circ / 2), 0, 5, 0, 2, Arc((0.0, 0.0), 1.0, math.pi / 2, math.pi)),
+            RoadSegment(2, round(road_per_circ / 2), 3, 4, 3, 1, Arc((road_dist, 0.0), 1.0, -math.pi / 2, math.pi)),
+            RoadSegment(3, round(road_per_circ / 2), 2, 2, 2, 0, Arc((road_dist, 0.0), 1.0, math.pi / 2, math.pi)),
+            RoadSegment(4, round(road_dist * road_per_circ / math.pi), 1, 1, 2, 5, Arc((road_dist / 2, -straight_y_offset + 1.0), straight_radius, math.pi / 2 - straight_sweep, 2 * straight_sweep)),
+            RoadSegment(5, round(road_dist * road_per_circ / math.pi), 2, 2, 1, 4, Arc((road_dist / 2, straight_y_offset - 1.0), straight_radius, -math.pi / 2 - straight_sweep, 2 * straight_sweep)),
         )
-        cars = tuple(CarDef(i, i % len(roads), 2 + int(road_per_roundabout * i / len(roads) / 4)) for i in range(car_count))
-        # Acceleration is usually within [-1..1] but there is a 20% chance for a 100% increase
-        accel_actions = (
-            (
-                ChancedOutcomeAccel(0.2, -2),
-                ChancedOutcomeAccel(0.8, -1),
-            ),
-            (
-                ChancedOutcomeAccel(1.0, 0),
-            ),
-            (
-                ChancedOutcomeAccel(0.8, 1),
-                ChancedOutcomeAccel(0.2, 2),
-            )
-        )
+        cars = tuple(CarDef(i, i % len(roads), 2 + int(road_per_circ * i / len(roads) / 4)) for i in range(car_count))
+        accel_actions = _accel_actions(high_acceleration_chance)
         return RoadNetwork(roads, cars, max_vel, 0, accel_actions)
 
     @staticmethod
     def create_crossing_roads_scenario(
         car_count: int = 4,
-        road_length_circ: int = 36,
+        road_per_circ: int = 36,
         max_vel: int = 4,
+        high_acceleration_chance: float = 0.2,
         right_road_scale: float = 0.8,
     ) -> "RoadNetwork":
         """Two looping roads joined by a straight middle road.
 
-        The right-hand loop is ``right_road_scale`` times as long as the
-        left-hand loop.
+        ``road_per_circ`` is the number of positions in the left loop when
+        travelled end to end: the left arc plus the shared middle road.
+        The right-hand arc is ``right_road_scale`` times as long as the
+        left-hand arc.
         """
         assert 0.0 < right_road_scale <= 1.0
 
         angle = math.pi / 6.0
-        radius = round(road_length_circ / math.tau)
-        road_length_arc = round(road_length_circ - 2 * angle * radius)
-        road_length_arc_right = max(1, round(road_length_arc * right_road_scale))
+        radius = round(road_per_circ / math.tau)
         road_length_middle = round(2 * math.sin(angle) * radius)
+        road_length_arc = road_per_circ - road_length_middle
+        road_length_arc_right = max(1, round(road_length_arc * right_road_scale))
 
         vis_straight_offset = math.sin(angle)
         vis_arc_center_offset = math.cos(angle)
@@ -183,20 +187,7 @@ class RoadNetwork(ConcurrentGame[RoadNetworkState]):
             )
             for i in range(car_count)
         )
-        # Acceleration is usually within [-1..1] but there is a 20% chance for a 100% increase
-        accel_actions = (
-            (
-                ChancedOutcomeAccel(0.2, -2),
-                ChancedOutcomeAccel(0.8, -1),
-            ),
-            (
-                ChancedOutcomeAccel(1.0, 0),
-            ),
-            (
-                ChancedOutcomeAccel(0.8, 1),
-                ChancedOutcomeAccel(0.2, 2),
-            )
-        )
+        accel_actions = _accel_actions(high_acceleration_chance)
         return RoadNetwork(roads, cars, max_vel, 0, accel_actions)
 
 

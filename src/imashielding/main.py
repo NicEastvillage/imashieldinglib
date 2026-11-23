@@ -23,7 +23,7 @@ class Scenario:
 
 SCENARIOS = {
     "roundabout": Scenario(
-        create_network=lambda: RoadNetwork.create_roundabout_scenario(road_length=200),
+        create_network=lambda: RoadNetwork.create_roundabout_scenario(road_per_circ=200),
         create_abstraction=AbstractRoundaboutSystem,
         create_safety=lambda net: roundabout_safety(6),
         fps=24,

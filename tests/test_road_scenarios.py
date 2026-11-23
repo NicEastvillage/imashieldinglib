@@ -75,7 +75,7 @@ class RoundaboutSafetyTest(unittest.TestCase):
 class RoundaboutNormalizationTest(unittest.TestCase):
     def test_normalize_projects_to_ego_and_nearest_car_ahead(self):
         network = RoadNetwork.create_roundabout_scenario(
-            car_count=2, road_length=12, max_vel=2
+            car_count=2, road_per_circ=12, max_vel=2
         )
         system = AbstractRoundaboutSystem(network)
         state = RoadNetworkState(
@@ -99,7 +99,7 @@ class RoundaboutNormalizationTest(unittest.TestCase):
 
     def test_roundabout_shield_matches_reference(self):
         network = RoadNetwork.create_roundabout_scenario(
-            car_count=2, road_length=12, max_vel=2
+            car_count=2, road_per_circ=12, max_vel=2
         )
         system = AbstractRoundaboutSystem(network)
         safety = roundabout_safety(min_dist=2)
@@ -260,18 +260,18 @@ class CrossingRoadsGeometryTest(unittest.TestCase):
     """The right crossing road is 10% shorter than the left one."""
 
     def setUp(self):
-        self.network = RoadNetwork.create_crossing_roads_scenario(car_count=2)
+        self.network = RoadNetwork.create_crossing_roads_scenario(car_count=2, right_road_scale=0.8)
         self.straight = self.network.roads[0].shape
         self.left = self.network.roads[1]
         self.right = self.network.roads[2]
 
     def test_right_road_length_is_ten_percent_shorter(self):
-        self.assertEqual(self.right.length, round(0.9 * self.left.length))
+        self.assertEqual(self.right.length, round(0.8 * self.left.length))
 
     def test_right_arc_is_drawn_ten_percent_shorter(self):
         left_length = abs(self.left.shape.sweep) * self.left.shape.radius
         right_length = abs(self.right.shape.sweep) * self.right.shape.radius
-        self.assertAlmostEqual(right_length / left_length, 0.9, places=6)
+        self.assertAlmostEqual(right_length / left_length, 0.8, places=6)
 
     def test_arcs_still_meet_the_straight_road(self):
         for arc in (self.left.shape, self.right.shape):
@@ -284,11 +284,12 @@ class CrossingRoadsGeometryTest(unittest.TestCase):
                 self.assertAlmostEqual(end_y, self.straight.start[1])
 
 
+
 class CrossingRoadsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.network = RoadNetwork.create_crossing_roads_scenario(
-            car_count=2, road_length_circ=12, max_vel=2
+            car_count=2, road_per_circ=12, max_vel=2
         )
         cls.system = AbstractRoadNetworkSystem(cls.network)
         cls.safety = road_safety(cls.network, min_dist=2, merge_space=2)
@@ -334,7 +335,7 @@ class CrossingRoadsTest(unittest.TestCase):
 class DoubleRoundaboutTest(unittest.TestCase):
     def test_double_roundabout_shield_matches_reference(self):
         network = RoadNetwork.create_double_roundabout_scenario(
-            car_count=2, road_per_roundabout=8, max_vel=2
+            car_count=2, road_per_circ=8, max_vel=2
         )
         system = AbstractRoadNetworkSystem(network)
         safety = road_safety(network, min_dist=2, merge_space=2)
