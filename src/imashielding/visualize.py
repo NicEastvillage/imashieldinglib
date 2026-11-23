@@ -41,6 +41,7 @@ WINDSHIELD_COLOR = (140, 190, 235)
 HEADLIGHT_COLOR = (255, 236, 160)
 BRAKE_COLOR = (220, 30, 30)
 TEXT_COLOR = (15, 15, 15)
+OVERLAY_TEXT_COLOR = (230, 230, 230)
 
 
 @dataclass(frozen=True)
@@ -185,12 +186,32 @@ def draw_cars(surface: pygame.Surface, system: RoadNetwork, state: RoadNetworkSt
         surface.blit(label, label.get_rect(center=view.point(pos)))
 
 
+def draw_text_block(
+    surface: pygame.Surface,
+    text: str,
+    position: Tuple[int, int],
+    font: pygame.font.Font,
+    anchor: str = "topleft",
+    color: Tuple[int, int, int] = OVERLAY_TEXT_COLOR,
+):
+    """Render newline-separated text one line per row at ``position``."""
+    labels = [font.render(line, True, color) for line in text.split("\n")]
+    line_height = font.get_linesize()
+    x, y = position
+    if anchor == "bottomleft":
+        y -= line_height * len(labels)
+    for label in labels:
+        surface.blit(label, (x, y))
+        y += line_height
+
+
 def visualize(
     net: RoadNetwork,
     steps: Optional[int] = None,
     shields: ShieldAssignment = {},
     fps: int = 8,
     policy: Optional[ActionPolicy] = None,
+    action_masking: bool = False,
 ):
     """Visualize a road network while it evolves.
 
@@ -204,6 +225,9 @@ def visualize(
             returning one action per car. When given, it replaces the random/shield
             action selection for every agent. The ``shields`` mapping is passed
             through unchanged so a policy can ignore it.
+        action_masking: Whether the policy restricts actions with a shield-based
+            action mask. Reported as "Shield: On" in the status overlay even when
+            no shield mapping is passed.
 
     Controls: space pauses, `e` single-steps, `r` resets, `esc` quits.
     """
@@ -219,6 +243,12 @@ def visualize(
     clock = pygame.time.Clock()
     font = pygame.font.Font(None, 24)
     view = create_view(net, WINDOW_WIDTH, WINDOW_HEIGHT)
+
+    controls_text = "SPACE: Start/Pause\nE: Step\nR: Reset"
+    status_text = (
+        f"Shield: {'On' if shields or action_masking else 'Off'}\n"
+        f"Policy: {'Learned' if policy is not None else 'Random'}"
+    )
 
     paused = steps == 0
     step = 0
@@ -271,5 +301,8 @@ def visualize(
         draw_roads(screen, net, view)
         draw_yield_lines(screen, net, view)
         draw_cars(screen, net, state, view, font)
+        margin = 12
+        draw_text_block(screen, controls_text, (margin, margin), font)
+        draw_text_block(screen, status_text, (margin, WINDOW_HEIGHT - margin), font, anchor="bottomleft")
         pygame.display.flip()
         clock.tick(fps)
