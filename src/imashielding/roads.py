@@ -103,7 +103,7 @@ class RoadNetwork(ConcurrentGame[RoadNetworkState]):
         return RoadNetwork((road,), cars, max_vel, 0, accel_actions)
 
     @staticmethod
-    def create_double_roundabout_scenario(car_count: int = 6, road_per_circ: int = 32, max_vel: int = 4, high_acceleration_chance: float = 0.2) -> "RoadNetwork":
+    def create_double_roundabout_scenario(car_count: int = 5, road_per_circ: int = 50, max_vel: int = 3, high_acceleration_chance: float = 0.2) -> "RoadNetwork":
         """Two roundabouts joined by two connecting roads.
 
         ``road_per_circ`` is the number of positions in one roundabout, split
@@ -127,9 +127,9 @@ class RoadNetwork(ConcurrentGame[RoadNetworkState]):
 
     @staticmethod
     def create_crossing_roads_scenario(
-        car_count: int = 4,
-        road_per_circ: int = 36,
-        max_vel: int = 4,
+        car_count: int = 5,
+        road_per_circ: int = 50,
+        max_vel: int = 3,
         high_acceleration_chance: float = 0.2,
         right_road_scale: float = 0.8,
     ) -> "RoadNetwork":

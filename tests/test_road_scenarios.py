@@ -260,7 +260,8 @@ class CrossingRoadsGeometryTest(unittest.TestCase):
     """The right crossing road is 10% shorter than the left one."""
 
     def setUp(self):
-        self.network = RoadNetwork.create_crossing_roads_scenario(car_count=2, right_road_scale=0.8)
+        # road_per_circ=36 makes the discrete lengths an exact 80% (rounding otherwise).
+        self.network = RoadNetwork.create_crossing_roads_scenario(car_count=2, road_per_circ=36, right_road_scale=0.8)
         self.straight = self.network.roads[0].shape
         self.left = self.network.roads[1]
         self.right = self.network.roads[2]

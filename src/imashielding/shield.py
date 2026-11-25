@@ -34,6 +34,10 @@ class Shield(Generic[ABS_STATE]):
         """
         raise NotImplementedError()
 
+    def is_released(self, state: ABS_STATE) -> bool:
+        """Whether ``state`` is a release state (another agent already violated its clause)."""
+        raise NotImplementedError()
+
     def with_normalizer(self, normalizer: Normalization[STATE, ABS_STATE]) -> 'Shield[STATE]':
         return NormalizingShield(normalizer, self)
 
@@ -100,14 +104,28 @@ class DGShield(Shield[ABS_STATE]):
 
 class NormalizingShield(Shield[STATE]):
     def __init__(self, normalize: Normalization[STATE, ABS_STATE], shield: Shield[ABS_STATE]):
-        self._normalize = normalize
+        self._normalize_func = normalize
         self._shield = shield
+        # Callers typically ask contains/is_released/get_safe_actions about the same
+        # state in a row; remember the last normalization.
+        self._last: Optional[Tuple[Any, Any]] = None
+
+    def _normalize(self, state: STATE) -> ABS_STATE:
+        last = self._last
+        if last is not None and last[0] == state:
+            return last[1]
+        abstract = self._normalize_func(state)
+        self._last = (state, abstract)
+        return abstract
 
     def get_safe_actions(self, state: STATE) -> Tuple[int, ...]:
         return self._shield.get_safe_actions(self._normalize(state))
 
     def contains(self, state: STATE) -> bool:
         return self._shield.contains(self._normalize(state))
+
+    def is_released(self, state: STATE) -> bool:
+        return self._shield.is_released(self._normalize(state))
 
 
 def _as_state_list(states: Any) -> list:

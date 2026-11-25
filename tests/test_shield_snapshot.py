@@ -1,6 +1,6 @@
-"""Opt-in snapshot test for the full default crossing-roads scenario.
+"""Opt-in snapshot test for the 2-car crossing-roads scenario (road_per_circ=36, max_vel=4).
 
-The default 2-car crossing scenario currently takes ~55 seconds to synthesise
+This scenario (the default before 2026-11-24) takes ~55 seconds to synthesise
 and produces a shield with ~100k states.  It is the scenario the performance work
 targets, so it is worth checking that optimisation does not change its result.
 Because it is slow, it is skipped unless ``IMASHIELDING_SLOW_TESTS=1`` is set.
@@ -27,13 +27,14 @@ from imashielding.roads import RoadNetwork
 from imashielding.roads_reduction import AbstractRoadNetworkSystem, road_safety
 from imashielding.shield import compute_shield
 
-# Fingerprint after making the right crossing road 10% shorter than the left
-# one (2026-11-13).
+# Fingerprint after fixing the merge rule of road_safety (2026-11-24): a car that
+# just merged checks the priority road up to merge_space behind it wherever it
+# landed, and of two cars that merged in the same step the faster one is at fault.
 DEFAULT_CROSSING_FINGERPRINT = (
-    "4b04ba071adbd99783bb36bc714fb1938fe5ed24ca68e9d7a10ef01b02d8022c"
+    "9cc66dc8a2472bb419169b99dbc12ac0fa24148c6f31b7ca06339ca28fbf4582"
 )
-DEFAULT_CROSSING_STATES = 94_771
-DEFAULT_CROSSING_RELEASE_STATES = 1_740
+DEFAULT_CROSSING_STATES = 85_688
+DEFAULT_CROSSING_RELEASE_STATES = 1_703
 
 
 def shield_fingerprint(shield):
@@ -54,7 +55,8 @@ def shield_fingerprint(shield):
 )
 class DefaultCrossingSnapshotTest(unittest.TestCase):
     def test_default_crossing_shield_is_unchanged(self):
-        network = RoadNetwork.create_crossing_roads_scenario(car_count=2)
+        # Pinned to the scenario defaults the snapshot was taken with.
+        network = RoadNetwork.create_crossing_roads_scenario(car_count=2, road_per_circ=36, max_vel=4)
         system = AbstractRoadNetworkSystem(network)
         safety = road_safety(network)
 
