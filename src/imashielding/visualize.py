@@ -44,6 +44,33 @@ TEXT_COLOR = (15, 15, 15)
 OVERLAY_TEXT_COLOR = (230, 230, 230)
 
 
+def _allowed_actions(net: RoadNetwork, shields: ShieldAssignment, state: RoadNetworkState, car_id: int) -> Tuple[int, ...]:
+    """The actions the car's shield allows, or all actions if the car has no shield."""
+    if car_id not in shields:
+        return tuple(range(net.get_agent_action_count(state, car_id)))
+    safe = shields[car_id].get_safe_actions(state)
+    if not safe:
+        # The state is already unsafe; default to brake
+        print(f'Shield has no safe action for car {car_id}; braking. state: {state}')
+        return (0,)
+    return tuple(safe)
+
+
+def random_policy(net: RoadNetwork) -> ActionPolicy:
+    """Pick uniformly among the allowed (shield-safe) actions."""
+    def policy(shields: ShieldAssignment, state: RoadNetworkState) -> Tuple[int, ...]:
+        return tuple(random.choice(_allowed_actions(net, shields, state, car.id)) for car in state.cars)
+    return policy
+
+
+def greedy_policy(net: RoadNetwork) -> ActionPolicy:
+    """Pick the highest allowed (shield-safe) action, i.e. accelerate whenever possible."""
+    # Assumption: Actions are ordered by acceleration (decelerate, coast, accelerate).
+    def policy(shields: ShieldAssignment, state: RoadNetworkState) -> Tuple[int, ...]:
+        return tuple(max(_allowed_actions(net, shields, state, car.id)) for car in state.cars)
+    return policy
+
+
 @dataclass(frozen=True)
 class View:
     """World-to-screen mapping fitted to the window (y-flipped)."""
@@ -221,15 +248,25 @@ def visualize(
         shields: Mapping from car id to shield. Used for agents without a policy,
             and for all agents when no policy is given. Map to nothing for no shield.
         fps: Frames per second.
-        policy: Optional callable ``policy(shields, state) -> tuple[int, ...]``
-            returning one action per car. When given, it replaces the random/shield
-            action selection for every agent. The ``shields`` mapping is passed
-            through unchanged so a policy can ignore it.
+        policy: Optional learned callable ``policy(shields, state) -> tuple[int, ...]``
+            returning one action per car. When given, the visualization starts with it
+            and it is added to the policies that `p` cycles through. The ``shields``
+            mapping is passed through unchanged so a policy can ignore it.
         action_masking: Whether the policy restricts actions with a shield-based
             action mask. Reported as "Shield: On" in the status overlay even when
             no shield mapping is passed.
 
-    Controls: space pauses, `e` single-steps, `r` resets, `esc` quits.
+    The shield can be toggled with `s` if a shield mapping is given. While it is off,
+    the policies receive an empty mapping: Random and Greedy then choose among all
+    actions, and a learned policy should drop its action mask (see
+    ``visualize_shieldable.py``).
+
+    The built-in policies are Random (uniform over the shield-safe actions) and Greedy
+    (the fastest shield-safe action). Without a shield for a car, all its actions are
+    allowed.
+
+    Controls: space pauses, `e` single-steps, `r` resets, `p` cycles the policy,
+    `s` toggles the shield, `esc` quits.
     """
 
     if shields is None:
@@ -244,11 +281,13 @@ def visualize(
     font = pygame.font.Font(None, 24)
     view = create_view(net, WINDOW_WIDTH, WINDOW_HEIGHT)
 
-    controls_text = "SPACE: Start/Pause\nE: Step\nR: Reset"
-    status_text = (
-        f"Shield: {'On' if shields or action_masking else 'Off'}\n"
-        f"Policy: {'Learned' if policy is not None else 'Random'}"
-    )
+    policies = [("Random", random_policy(net)), ("Greedy", greedy_policy(net))]
+    if policy is not None:
+        policies.append(("Learned", policy))
+    policy_index = len(policies) - 1 if policy is not None else 0
+
+    controls_text = "SPACE: Start/Pause\nE: Step\nR: Reset\nP: Change policy\nS: Toggle shield"
+    shield_on = bool(shields) or action_masking
 
     paused = steps == 0
     step = 0
@@ -268,22 +307,22 @@ def visualize(
                     paused = True
                     state = net.get_init_state()
                     step = 0
+                if event.key == pygame.K_p:
+                    policy_index = (policy_index + 1) % len(policies)
+                if event.key == pygame.K_s:
+                    if shields:
+                        shield_on = not shield_on
+                    else:
+                        print('No shield to toggle (the visualization was started without one).')
                 if event.key == pygame.K_t:
                     print('current state:', state)
 
         if not paused or manual_step:
             try:
                 # FIXME: If any agent has a policy, all of them must have a policy. Use mapping similar to shields?
-                if policy is not None:
-                    actions = tuple(int(a) for a in policy(shields, state))
-                else:
-                    # Random action allowed by shield
-                    actions = tuple(
-                        random.choice(shields[car.id].get_safe_actions(state))
-                        if car.id in shields
-                        else random.randrange(net.get_agent_action_count(state, car.id))
-                        for car in net.cars
-                    )
+                _, current_policy = policies[policy_index]
+                active_shields = shields if shield_on else {}
+                actions = tuple(int(a) for a in current_policy(active_shields, state))
 
                 successors = net.get_successors(state, actions)
                 state = random.choices(successors, weights=[s.chance for s in successors], k=1)[0].state
@@ -303,6 +342,7 @@ def visualize(
         draw_cars(screen, net, state, view, font)
         margin = 12
         draw_text_block(screen, controls_text, (margin, margin), font)
+        status_text = f"Shield: {'On' if shield_on else 'Off'}\nPolicy: {policies[policy_index][0]}"
         draw_text_block(screen, status_text, (margin, WINDOW_HEIGHT - margin), font, anchor="bottomleft")
         pygame.display.flip()
         clock.tick(fps)
