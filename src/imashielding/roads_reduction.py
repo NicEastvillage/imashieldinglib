@@ -1,3 +1,4 @@
+import dataclasses
 import hashlib
 import heapq
 from itertools import product
@@ -10,14 +11,16 @@ from imashielding.systems import LabelledTransitionSystem, ChancedState, StateSa
 def _network_cache_key(network: RoadNetwork) -> str:
     """Stable digest of every property of a road network that affects synthesis.
 
-    Includes the road topology, visual shapes, car definitions, velocity bounds and
-    acceleration distributions, i.e. everything that determines the transition
-    system and its initial state.  ``repr`` of the frozen dataclasses involved is
-    deterministic.
+    Includes the road topology, car definitions, velocity bounds and acceleration
+    distributions, i.e. everything that determines the transition system and its
+    initial state.  The visual ``shape`` of road segments is deliberately excluded:
+    it is only used for rendering, so changing it must not trigger resynthesis.
+    ``repr`` of the frozen dataclasses involved is deterministic.
     """
+    roads = tuple(dataclasses.replace(r, shape=None) for r in network.roads)
     parts = (
         type(network).__qualname__,
-        repr(network.roads),
+        repr(roads),
         repr(network.cars),
         repr(network.max_vel),
         repr(network.min_vel),

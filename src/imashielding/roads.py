@@ -110,7 +110,7 @@ class RoadNetwork(ConcurrentGame[RoadNetworkState]):
         across its two segments.
         """
         road_dist = 2.4
-        straight_radius = 3.0
+        straight_radius = 2.2
         straight_y_offset = math.sqrt(straight_radius**2 - (road_dist / 2)**2)
         straight_sweep = math.acos(straight_y_offset / straight_radius)
         roads = (
@@ -118,8 +118,8 @@ class RoadNetwork(ConcurrentGame[RoadNetworkState]):
             RoadSegment(1, round(road_per_circ / 2), 0, 5, 0, 2, Arc((0.0, 0.0), 1.0, math.pi / 2, math.pi)),
             RoadSegment(2, round(road_per_circ / 2), 3, 4, 3, 1, Arc((road_dist, 0.0), 1.0, -math.pi / 2, math.pi)),
             RoadSegment(3, round(road_per_circ / 2), 2, 2, 2, 0, Arc((road_dist, 0.0), 1.0, math.pi / 2, math.pi)),
-            RoadSegment(4, round(road_dist * road_per_circ / math.pi), 1, 1, 2, 5, Arc((road_dist / 2, -straight_y_offset + 1.0), straight_radius, math.pi / 2 - straight_sweep, 2 * straight_sweep)),
-            RoadSegment(5, round(road_dist * road_per_circ / math.pi), 2, 2, 1, 4, Arc((road_dist / 2, straight_y_offset - 1.0), straight_radius, -math.pi / 2 - straight_sweep, 2 * straight_sweep)),
+            RoadSegment(4, round(road_dist * road_per_circ / math.pi), 1, 1, 2, 5, Arc((road_dist / 2, -straight_y_offset + 1.0), straight_radius, math.pi / 2 - straight_sweep, 2 * straight_sweep, sweep_margin=0.05)),
+            RoadSegment(5, round(road_dist * road_per_circ / math.pi), 2, 2, 1, 4, Arc((road_dist / 2, straight_y_offset - 1.0), straight_radius, -math.pi / 2 - straight_sweep, 2 * straight_sweep, sweep_margin=0.05)),
         )
         cars = tuple(CarDef(i, i % len(roads), 2 + int(road_per_circ * i / len(roads) / 4)) for i in range(car_count))
         accel_actions = _accel_actions(high_acceleration_chance)

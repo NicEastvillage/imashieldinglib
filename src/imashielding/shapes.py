@@ -9,12 +9,13 @@ class Arc:
     """Visual placement of an arced road segment, traversed counter-clockwise unless sweep is negative."""
     center: Tuple[float, float]
     radius: float
-    start: float   # radians
-    sweep: float   # radians
+    start: float        # radians
+    sweep: float        # radians
+    sweep_margin: float = 0. # radians, how much to offset the first and position on the sweep
 
     def frame(self, t: float) -> Tuple[Tuple[float, float], float]:
         """World position and travel heading at fraction t in [0, 1) along the arc."""
-        angle = self.start + t * self.sweep
+        angle = self.start + t * (self.sweep - self.sweep_margin)
         facing = angle + math.pi / 2 if self.sweep >= 0 else angle - math.pi / 2
         return ((self.center[0] + self.radius * math.cos(angle),
                  self.center[1] + self.radius * math.sin(angle)),
